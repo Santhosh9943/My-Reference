@@ -150,6 +150,10 @@ Rclone provides a built-in Web UI for managing remotes and file transfers.
 ```bash
 rclone rcd --rc-web-gui
 ```
+or
+```bash
+rclone rcd --rc-web-gui --rc-addr=0.0.0.0:5572 --rc-user=root --rc-pass=root
+```
 
 Then visit:
 

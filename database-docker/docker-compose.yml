@@ -1,8 +1,7 @@
 services:
   # MySQL
   mysql:
-    image: mysql:8
-    container_name: mysql
+    image: mysql:8.0
     restart: unless-stopped
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
@@ -11,6 +10,8 @@ services:
       - "${MYSQL_PORT}:3306"
     volumes:
       - mysql_data:/var/lib/mysql
+    networks:
+      - backend
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}"]
       interval: 10s
@@ -19,8 +20,7 @@ services:
 
   # MariaDB
   mariadb:
-    image: mariadb:10
-    container_name: mariadb
+    image: mariadb:10.11
     restart: unless-stopped
     environment:
       MARIADB_ROOT_PASSWORD: ${MARIADB_ROOT_PASSWORD}
@@ -29,6 +29,8 @@ services:
       - "${MARIADB_PORT}:3306"
     volumes:
       - mariadb_data:/var/lib/mysql
+    networks:
+      - backend
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MARIADB_ROOT_PASSWORD}"]
       interval: 10s
@@ -37,8 +39,7 @@ services:
 
   # PostgreSQL
   postgres:
-    image: postgres:16
-    container_name: postgres
+    image: postgres:15
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
@@ -48,16 +49,17 @@ services:
       - "${POSTGRES_PORT}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    networks:
+      - backend
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
       interval: 10s
       timeout: 5s
       retries: 5
 
-  # MongoDB (Fixed)
+  # MongoDB
   mongodb:
-    image: mongo:7
-    container_name: mongodb
+    image: mongo:6
     restart: unless-stopped
     environment:
       MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USERNAME}
@@ -66,95 +68,38 @@ services:
       - "${MONGODB_PORT}:27017"
     volumes:
       - mongodb_data:/data/db
+    networks:
+      - backend
     healthcheck:
-      test: |
-        mongosh --quiet --eval "db.runCommand({ ping: 1 })" -u $$MONGO_INITDB_ROOT_USERNAME -p $$MONGO_INITDB_ROOT_PASSWORD --authenticationDatabase admin
+      test: ["CMD-SHELL", "mongosh --quiet --eval \"db.runCommand({ ping: 1 })\" -u $${MONGO_INITDB_ROOT_USERNAME} -p $${MONGO_INITDB_ROOT_PASSWORD} --authenticationDatabase admin"]
       interval: 15s
       timeout: 10s
       retries: 5
+      start_period: 20s
 
   # Redis
   redis:
     image: redis:7
-    container_name: redis
     restart: unless-stopped
     ports:
       - "${REDIS_PORT}:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - backend
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
 
-  # phpMyAdmin
-  phpmyadmin:
-    image: phpmyadmin/phpmyadmin
-    container_name: phpmyadmin
-    restart: unless-stopped
-    environment:
-      PMA_HOST: mysql
-      PMA_PORT: 3306
-      PMA_ARBITRARY: 1
-    ports:
-      - "${PHPMYADMIN_PORT}:80"
-    depends_on:
-      mysql:
-        condition: service_healthy
-      mariadb:
-        condition: service_healthy
-
-  # pgAdmin
-  pgadmin:
-    image: dpage/pgadmin4
-    container_name: pgadmin
-    restart: unless-stopped
-    environment:
-      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL}
-      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD}
-    ports:
-      - "${PGADMIN_PORT}:80"
-    depends_on:
-      postgres:
-        condition: service_healthy
-
-  # Mongo Express (Fixed)
-  mongo-express:
-    image: mongo-express
-    container_name: mongo-express
-    restart: unless-stopped
-    environment:
-      ME_CONFIG_MONGODB_URL: mongodb://${MONGO_ROOT_USERNAME}:${MONGO_ROOT_PASSWORD}@mongodb:27017/?authSource=admin
-      ME_CONFIG_BASICAUTH_USERNAME: ${MONGO_EXPRESS_USERNAME}
-      ME_CONFIG_BASICAUTH_PASSWORD: ${MONGO_EXPRESS_PASSWORD}
-    ports:
-      - "${MONGO_EXPRESS_PORT}:8081"
-    depends_on:
-      mongodb:
-        condition: service_healthy
-
-  # Redis Commander
-  redis-commander:
-    image: rediscommander/redis-commander:latest
-    container_name: redis-commander
-    restart: unless-stopped
-    environment:
-      REDIS_HOSTS: local:redis:6379
-    ports:
-      - "${REDIS_COMMANDER_PORT}:8081"
-    depends_on:
-      redis:
-        condition: service_healthy
-
-  # Adminer
-  adminer:
-    image: adminer
-    container_name: adminer
-    restart: unless-stopped
-    ports:
-      - "${ADMINER_PORT}:8080"
-
 volumes:
   mysql_data:
   mariadb_data:
   postgres_data:
   mongodb_data:
+  redis_data:
+
+networks:
+  backend:
+    driver: bridge
